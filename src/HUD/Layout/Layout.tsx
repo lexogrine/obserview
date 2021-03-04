@@ -20,8 +20,7 @@ interface Props {
 
 interface State {
   winner: Team | null,
-  showWin: boolean,
-  forceHide: boolean
+  showWin: boolean
 }
 
 export default class Layout extends React.Component<Props, State> {
@@ -29,8 +28,7 @@ export default class Layout extends React.Component<Props, State> {
     super(props);
     this.state = {
       winner: null,
-      showWin: false,
-      forceHide: false
+      showWin: false
     }
   }
 
@@ -41,13 +39,6 @@ export default class Layout extends React.Component<Props, State> {
           this.setState({ showWin: false })
         }, 4000)
       });
-    });
-    actions.on("boxesState", (state: string) => {
-      if (state === "show") {
-        this.setState({ forceHide: false });
-      } else if (state === "hide") {
-        this.setState({ forceHide: true });
-      }
     });
   }
 
@@ -90,26 +81,9 @@ export default class Layout extends React.Component<Props, State> {
 
         <div className={"boxes left"}>
           <UtilityLevel side={left.side} players={game.players} show={true} />
-          <MoneyBox
-            team={left.side}
-            side="left"
-            loss={Math.min(left.consecutive_round_losses * 500 + 1400, 3400)}
-            equipment={leftPlayers.map(player => player.state.equip_value).reduce((pre, now) => pre + now, 0)}
-            money={leftPlayers.map(player => player.state.money).reduce((pre, now) => pre + now, 0)}
-            show={true}
-          />
         </div>
         <div className={"boxes right"}>
           <UtilityLevel side={right.side} players={game.players} show={true} />
-
-          <MoneyBox
-            team={right.side}
-            side="right"
-            loss={Math.min(right.consecutive_round_losses * 500 + 1400)}
-            equipment={rightPlayers.map(player => player.state.equip_value).reduce((pre, now) => pre + now, 0)}
-            money={rightPlayers.map(player => player.state.money).reduce((pre, now) => pre + now, 0)}
-            show={true}
-          />
         </div>
       </div>
     );

@@ -42,7 +42,7 @@
                 
             }
             .dead-stats {
-                right: 8px;
+                right: -70px;
             }
         }
     }
@@ -51,7 +51,7 @@
         .player {
             flex-direction: row-reverse;
             .dead-stats {
-                left: 8px;
+                left: -70px;
             }
             .player_data {
                 flex-direction: row-reverse;
@@ -148,7 +148,7 @@
             position: absolute;
             height: 85%;
             width: 60px;
-            display: none;
+            display: flex;
             flex-direction: column;
             font-weight: 600;
             color: white;
@@ -168,7 +168,7 @@
         }
         .player_data {
             background-color: var(--sub-panel-color);
-            width: 415px;
+            width: 250px;
             display: flex;
             flex-direction: row;
             position: relative;

@@ -8,5 +8,6 @@
     "boltobserv":{
         "css":true,
         "maps":true
-    }
+    },
+    "allowAppsOnTop": true
 }

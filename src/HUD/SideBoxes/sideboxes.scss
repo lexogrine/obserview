@@ -72,17 +72,15 @@
 	}
 }
 .utilitybox {
-	width: 415px;
+	width: 250px;
 	height: 70px;
 	display: flex;
 	flex-direction: row;
 	opacity: 1;
 	transition: all 0.75s;
 	background-color: var(--sub-panel-color);
-	margin-bottom: 4px;
 	margin-top: 4px;
 	flex-direction: column;
-	margin-bottom: 4px;
 	border-radius: 20px 20px 0 0;
 	.title_container {
 		display: flex;

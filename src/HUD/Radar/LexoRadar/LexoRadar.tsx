@@ -38,7 +38,10 @@ class App extends React.Component<IProps> {
     )
   }
   renderDot = (player: RadarPlayerObject) => {
-    const label = this.props.avatars && avatars[player.steamid] && avatars[player.steamid].url ? <img src={avatars[player.steamid].url} alt={player.steamid} /> : player.label;
+    const label = this.props.avatars && avatars[player.steamid] && avatars[player.steamid].url ? <div>
+      <img src={avatars[player.steamid].url} alt={player.steamid} />
+      <div>{player.label}</div>
+    </div> : player.label;
     return (
       <div key={player.id}
         className={`player ${player.side} ${player.hasBomb ? 'hasBomb':''} ${player.isActive ? 'active' : ''} ${!player.isAlive ? 'dead' : ''} ${player.visible ? 'visible':'hidden'}`}
@@ -48,7 +51,7 @@ class App extends React.Component<IProps> {
           height: config.playerSize,
         }}>
         <div className="background" style={{ transform: `rotate(${45 + player.position[2]}deg)` }}></div>
-        <div className="label">{label}</div>
+        <div className="label">{ player.isAlive ? label : 'X'}</div>
       </div>
     )
   }

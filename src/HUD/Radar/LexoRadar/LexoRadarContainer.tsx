@@ -4,6 +4,7 @@ import maps, { ScaleConfig } from './maps';
 import LexoRadar from './LexoRadar';
 import { ExtendedGrenade, Grenade, RadarPlayerObject, RadarGrenadeObject, BombObject } from './interface';
 import config from './config';
+import { actions } from '../../../App';
 
 let playersStates: Player[][] = [];
 let grenadesStates: ExtendedGrenade[][] = [];
@@ -61,7 +62,15 @@ interface IProps {
     mapName: string
 }
 
-class App extends React.Component<IProps> {
+class App extends React.Component<IProps, { avatars: boolean }> {
+    state = {
+        avatars: false
+    }
+    componentDidMount(){
+        actions.on("toggleAvatars", () => {
+            this.setState({ avatars: !this.state.avatars });
+        })
+    }
     round = (n: number) => {
         const r = 0.02;
         return Math.round(n / r) * r;
@@ -302,6 +311,7 @@ class App extends React.Component<IProps> {
                 bomb={bomb}
                 mapName={this.props.mapName}
                 mapConfig={maps[this.props.mapName]}
+                avatars={this.state.avatars}
             />
         </div>;
     }
