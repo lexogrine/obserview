@@ -17,10 +17,7 @@ Standalone Radar HUD for Lexogrine HUD Manager with drawing tool included
 ## Keybinds:
 ### **Left Alt + A**
 >Toggles avatars
-### **Left Alt + W**
->Toggles weapons
-### **Left Alt + T**
->Switches between full, condensed and compact view
+
 
 
 ## Preview
