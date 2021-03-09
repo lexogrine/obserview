@@ -18,6 +18,9 @@ Standalone Radar HUD for Lexogrine HUD Manager with drawing tool included
 ### **Left Alt + A**
 >Toggles avatars
 
+### **C**
+>Clears drawing
+
 
 
 ## Preview
