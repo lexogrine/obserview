@@ -31,3 +31,6 @@ Standalone Radar HUD for Lexogrine HUD Manager with drawing tool included
 
 To download it just click here: [DOWNLOAD OBSERVIEW](https://github.com/lexogrine/obserview/releases/latest)
 
+# Credits
+Huge love to [SimpleRadar](https://readtldr.gg/simpleradar) project for map backgrounds
+
