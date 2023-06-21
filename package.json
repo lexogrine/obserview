@@ -1,22 +1,20 @@
 {
   "name": "obserview",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "homepage": "./",
   "private": true,
   "dependencies": {
     "@craco/craco": "^5.7.0",
     "@types/jest": "24.0.19",
-    "@types/node": "12.11.1",
-    "@types/react": "16.9.9",
-    "@types/react-dom": "16.9.2",
-    "csgogsi-socket": "^1.3.3",
-    "node-sass": "^4.14.1",
+    "@types/node": "16.11.20",
+    "@types/react": "17.0.38",
+    "@types/react-dom": "17.0.11",
+    "csgogsi-socket": "^2.7.0",
     "query-string": "^6.12.1",
-    "react": "^16.13.1",
-    "react-dom": "^16.13.1",
-    "react-scripts": "4.0.0",
-    "socket.io-client": "^2.3.0",
-    "typescript": "3.6.4"
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "react-scripts": "5.0.0",
+    "typescript": "^4.5.4"
   },
   "license": "GPL-3.0",
   "scripts": {
@@ -47,6 +45,7 @@
     "@types/socket.io-client": "^1.4.32",
     "internal-ip": "^6.2.0",
     "npm-build-zip": "^1.0.2",
+    "open": "^8.0.2",
     "open-browser-plugin": "^1.1.1",
     "sass": "^1.32.5"
   }

@@ -129,7 +129,7 @@ class App extends React.Component<IProps, { avatars: boolean }> {
     getBombPosition = (mapConfig: ScaleConfig) => {
         const bombData = bombStates.slice(0, positionsToAverage).filter(pl => !!pl);
         if (bombData.length === 0) return null;
-        const positions = bombData.map(bombEntry => this.parsePosition(bombEntry.position.split(", ").map(pos => Number(pos)), config.playerSize, mapConfig));
+        const positions = bombData.map(bombEntry => this.parsePosition(bombEntry.position, config.playerSize, mapConfig));
         const entryAmount = positions.length;
         let x = 0;
         let y = 0;

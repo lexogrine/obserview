@@ -1,17 +1,45 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import Layout from './HUD/Layout/Layout';
 import api, { port, isDev } from './api/api';
 import { loadAvatarURL } from './api/avatars';
 import ActionManager, { ConfigManager } from './api/actionManager';
 
-import CSGOGSI, { CSGO, PlayerExtension } from "csgogsi-socket";
-import Canvas from './Canvas';
+import { CSGO, PlayerExtension, GSISocket, CSGORaw } from "csgogsi-socket";
 import { Match } from './api/interfaces';
 
-export const { GSI, socket } = CSGOGSI(isDev ? `localhost:${port}` : '/', "update");
+let isInWindow = !!window.parent.ipcApi;
+
+export const { GSI, socket } = GSISocket(isDev ? `localhost:${port}` : '/', "update");
+
+if(isInWindow){
+	window.parent.ipcApi.receive('raw', (data: CSGORaw, damage?: RoundDamage[]) => {
+		if(damage){
+			GSI.damage = damage;
+		}
+		GSI.digest(data);
+	});
+}
+
+type RoundPlayerDamage = {
+	steamid: string;
+	damage: number;
+};
+type RoundDamage = {
+	round: number;
+	players: RoundPlayerDamage[];
+};
+
+socket.on('update', (_csgo: any, damage?: RoundDamage[]) => {
+	if(damage) GSI.damage = damage;
+});
 
 export const actions = new ActionManager();
 export const configs = new ConfigManager();
+
+export const hudIdentity = {
+	name: '',
+	isDev: false
+};
 
 interface DataLoader {
 	match: Promise<void> | null
@@ -21,30 +49,34 @@ const dataLoader: DataLoader = {
 	match: null
 }
 
-const App = () => {
-	const [match, setMatch] = useState<Match | null>(null);
-	const [game, setGame] = useState<CSGO | null>(null);
-	const [steamids, setSteamids] = useState<string[]>([]);
-	const [checked, setChecked] = useState<boolean>(false);
-	const [ loading, setLoading ] = useState(false);
+class App extends React.Component<any, { match: Match | null, game: CSGO | null, steamids: string[], checked: boolean }> {
+	constructor(props: any) {
+		super(props);
+		this.state = {
+			game: null,
+			steamids: [],
+			match: null,
+			checked: false
+		}
+	}
 
-	const verifyPlayers = async (game: CSGO) => {
-		if(loading) return;
-		setLoading(true);
-		const newSteamids = game.players.map(player => player.steamid);
-		newSteamids.forEach(steamid => {
+	verifyPlayers = async (game: CSGO) => {
+		const steamids = game.players.map(player => player.steamid);
+		steamids.forEach(steamid => {
 			loadAvatarURL(steamid);
 		})
 
-		if (newSteamids.every(steamid => steamids.includes(steamid))) {
+		if (steamids.every(steamid => this.state.steamids.includes(steamid))) {
 			return;
 		}
 
 		const loaded = GSI.players.map(player => player.steamid);
 
-		const extensioned = await api.players.get();
+		const notCheckedPlayers = steamids.filter(steamid => !loaded.includes(steamid));
 
-		const lacking = newSteamids.filter(steamid => !loaded.includes(steamid)).filter(steamid => extensioned.map(player => player.steamid).includes(steamid));
+		const extensioned = await api.players.get(notCheckedPlayers);
+
+		const lacking = notCheckedPlayers.filter(steamid => extensioned.map(player => player.steamid).includes(steamid));
 
 		const players: PlayerExtension[] = extensioned
 			.filter(player => lacking.includes(player.steamid))
@@ -63,88 +95,30 @@ const App = () => {
 		const gsiLoaded = GSI.players;
 
 		gsiLoaded.push(...players);
-
-		GSI.loadPlayers(gsiLoaded);
-
-		setSteamids(newSteamids);
-		setLoading(false);
+		
+		GSI.players = gsiLoaded;
+		this.setState({ steamids });
 	}
 
-	const loadMatch = async (force = false) => {
-		if (!dataLoader.match || force) {
-			dataLoader.match = new Promise((resolve) => {
-				api.match.getCurrent().then(match => {
-					if (!match) {
-						dataLoader.match = null;
-						return;
-					}
-					setMatch(match);
 
-					let isReversed = false;
-					if (GSI.last) {
-						const mapName = GSI.last.map.name.substring(GSI.last.map.name.lastIndexOf('/') + 1);
-						const current = match.vetos.filter(veto => veto.mapName === mapName)[0];
-						if (current && current.reverseSide) {
-							isReversed = true;
-						}
-						setChecked(true);
-					}
-					if (match.left.id) {
-						api.teams.getOne(match.left.id).then(left => {
-							const gsiTeamData = { id: left._id, name: left.name, country: left.country, logo: left.logo, map_score: match.left.wins, extra: left.extra };
-
-							if (!isReversed) GSI.setTeamOne(gsiTeamData);
-							else GSI.setTeamTwo(gsiTeamData);
-						});
-					}
-					if (match.right.id) {
-						api.teams.getOne(match.right.id).then(right => {
-							const gsiTeamData = { id: right._id, name: right.name, country: right.country, logo: right.logo, map_score: match.right.wins, extra: right.extra };
-
-							if (!isReversed) GSI.setTeamTwo(gsiTeamData);
-							else GSI.setTeamOne(gsiTeamData);
-						});
-					}
-
-
-
-				}).catch(() => {
-					dataLoader.match = null;
-				});
-			});
-		}
-	}
-
-	const onData = (newGame: CSGO) => {
-		if (!game) verifyPlayersRef.current(newGame);
-		setGame(newGame);
-	}
-
-	const verifyPlayersRef = useRef(verifyPlayers);
-
-	const onDataRef = useRef(onData);
-
-	useEffect(() => {
-		verifyPlayersRef.current = verifyPlayers;
-		onDataRef.current = onData;
-	})
-
-	useEffect(() => {
-		loadMatch();
+	componentDidMount() {
+		this.loadMatch();
 		const href = window.location.href;
+		socket.emit("started");
 		let isDev = false;
 		let name = '';
 		if (href.indexOf('/huds/') === -1) {
 			isDev = true;
-			name = (Math.random() * 1000 + 1).toString(36).replace(/[^a-z]+/g, '').substr(0, 15)
+			name = (Math.random() * 1000 + 1).toString(36).replace(/[^a-z]+/g, '').substr(0, 15);
+			hudIdentity.isDev = true;
 		} else {
 			const segment = href.substr(href.indexOf('/huds/') + 6);
 			name = segment.substr(0, segment.lastIndexOf('/'));
+			hudIdentity.name = name;
 		}
 
 		socket.on("readyToRegister", () => {
-			console.log("A")
-			socket.emit("register", name, isDev);
+			socket.emit("register", name, isDev, "csgo", isInWindow ? "IPC" : "DEFAULT");
 		});
 		socket.on(`hud_config`, (data: any) => {
 			configs.save(data);
@@ -157,30 +131,81 @@ const App = () => {
 		});
 
 		socket.on("refreshHUD", () => {
-			window.top.location.reload();
+			window.top?.location.reload();
 		});
 
-		GSI.on('data', onDataRef.current);
+		socket.on("update_mirv", (data: any) => {
+			GSI.digestMIRV(data);
+		})
+		GSI.on('data', game => {
+			if (!this.state.game || this.state.steamids.length) this.verifyPlayers(game);
+			
+			const wasLoaded = !!this.state.game;
+
+			this.setState({ game }, () => {
+				if(!wasLoaded) this.loadMatch(true);
+			});
+		});
 		socket.on('match', () => {
-			loadMatch(true);
+
+			this.loadMatch(true);
 		});
-	}, []);
 
-	useEffect(() => {
-		if (!checked) {
-			loadMatch();
+	}
+
+	loadMatch = async (force = false) => {
+		if (!dataLoader.match || force) {
+			dataLoader.match = new Promise((resolve) => {
+				api.match.getCurrent().then(match => {
+					if (!match) {
+						GSI.teams.left = null;
+						GSI.teams.right = null;
+						return;
+					}
+					this.setState({ match });
+
+					let isReversed = false;
+					if (GSI.last) {
+						const mapName = GSI.last.map.name.substring(GSI.last.map.name.lastIndexOf('/') + 1);
+						const current = match.vetos.filter(veto => veto.mapName === mapName)[0];
+						if (current && current.reverseSide) {
+							isReversed = true;
+						}
+						this.setState({ checked: true });
+					}
+					if (match.left.id) {
+						api.teams.getOne(match.left.id).then(left => {
+							const gsiTeamData = { id: left._id, name: left.name, country: left.country, logo: left.logo, map_score: match.left.wins, extra: left.extra };
+
+							if (!isReversed) {
+								GSI.teams.left = gsiTeamData;
+							}
+							else GSI.teams.right = gsiTeamData;
+						});
+					}
+					if (match.right.id) {
+						api.teams.getOne(match.right.id).then(right => {
+							const gsiTeamData = { id: right._id, name: right.name, country: right.country, logo: right.logo, map_score: match.right.wins, extra: right.extra };
+
+							if (!isReversed) GSI.teams.right = gsiTeamData;
+							else GSI.teams.left = gsiTeamData;
+						});
+					}
+
+
+
+				}).catch(() => {
+					//dataLoader.match = null;
+				});
+			});
 		}
-	}, [checked]);
-
-	if (!game) return '';
-	return (
-		<>
-		<Layout game={game} match={match} />
-		<Canvas />
-		</>
-	);
-
+	}
+	render() {
+		if (!this.state.game) return null;
+		return (
+			<Layout game={this.state.game} match={this.state.match} />
+		);
+	}
 
 }
-
 export default App;
