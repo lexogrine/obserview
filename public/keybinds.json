@@ -2,13 +2,5 @@
     {
         "bind":"Alt+A",
         "action":"toggleAvatars"
-    },
-    {
-        "bind":"Alt+W",
-        "action":"toggleWeapons"
-    },
-    {
-        "bind":"Alt+T",
-        "action":"toggleView"
     }
 ]

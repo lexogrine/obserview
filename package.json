@@ -23,7 +23,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "pack": "npm run build && npm run zip"
+    "pack": "npm run build && npm run zip",
+    "sign": "npm run build && node sign.js && npm-build-zip --name=signed"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -41,9 +42,11 @@
     ]
   },
   "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@types/history": "^4.7.5",
     "@types/socket.io-client": "^1.4.32",
     "internal-ip": "^6.2.0",
+    "jsonwebtoken": "^8.5.1",
     "npm-build-zip": "^1.0.2",
     "open": "^8.0.2",
     "open-browser-plugin": "^1.1.1",
