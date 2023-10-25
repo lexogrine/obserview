@@ -4,10 +4,10 @@
     "author":"Lexogrine",
     "legacy": false,
     "radar": true,
+    "game":"cs2",
     "killfeed": true,
     "boltobserv":{
         "css":true,
         "maps":true
-    },
-    "allowAppsOnTop": true
+    }
 }

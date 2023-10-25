@@ -1,320 +1,80 @@
-import React from 'react';
-import { Player, Bomb } from 'csgogsi-socket';
-import maps, { ScaleConfig } from './maps';
+import { Player, Bomb, Grenade, FragOrFireBombOrFlashbandGrenade } from 'csgogsi';
+import maps from './maps';
 import LexoRadar from './LexoRadar';
-import { ExtendedGrenade, Grenade, RadarPlayerObject, RadarGrenadeObject, BombObject } from './interface';
-import config from './config';
-import { actions } from '../../../App';
+import { RadarPlayerObject, RadarGrenadeObject } from './interface';
+import { EXPLODE_TIME_FRAG, SPLICE_BY, explosionPlaces, extendGrenade, extendPlayer, grenadesStates, playersStates } from './utils';
+import { GSI } from '../../../api/HUD';
 
-let playersStates: Player[][] = [];
-let grenadesStates: ExtendedGrenade[][] = [];
-let bombStates: Bomb[] = [];
-const directions: { [key: string]: number } = {};
-
-
-const positionsToAverage = 10;
-
-
-const calculateDirection = (player: Player) => {
-    if (directions[player.steamid] && !player.state.health) return directions[player.steamid];
-
-    const [forwardV1, forwardV2] = player.forward;
-    let direction = 0;
-
-    const [axisA, axisB] = [Math.asin(forwardV1), Math.acos(forwardV2)].map(axis => axis * 180 / Math.PI);
-
-    if (axisB < 45) {
-        direction = Math.abs(axisA);
-    } else if (axisB > 135) {
-        direction = 180 - Math.abs(axisA);
-    } else {
-        direction = axisB;
-    }
-
-    if (axisA < 0) {
-        direction = -(direction -= 360);
-    }
-
-    if (!directions[player.steamid]) {
-        directions[player.steamid] = direction;
-    }
-
-    const previous = directions[player.steamid];
-
-    let modifier = previous;
-    modifier -= 360 * Math.floor(previous / 360);
-    modifier = -(modifier -= direction);
-
-    if (Math.abs(modifier) > 180) {
-        modifier -= 360 * Math.abs(modifier) / modifier;
-    }
-    directions[player.steamid] += modifier;
-
-    return directions[player.steamid];
-}
-
+const DESCALE_ON_ZOOM = true;
 interface IProps {
     players: Player[],
     bomb?: Bomb | null,
     player: Player | null,
-    grenades?: any
+    grenades: Grenade[]
     size?: number,
     mapName: string
 }
 
-class App extends React.Component<IProps, { avatars: boolean }> {
-    state = {
-        avatars: false
+GSI.prependListener("data", () => {
+    
+    const currentGrenades = GSI.current?.grenades || []
+    grenadesStates.unshift(currentGrenades);
+    grenadesStates.splice(SPLICE_BY);
+
+    playersStates.unshift(GSI.current?.players || []);
+    playersStates.splice(SPLICE_BY);
+});
+
+GSI.prependListener("data", data => {
+    const { last } = GSI;
+    if(!last) return;
+
+    for(const grenade of data.grenades.filter((grenade): grenade is FragOrFireBombOrFlashbandGrenade => grenade.type === "frag")){
+        const old = last.grenades.find((oldGrenade): oldGrenade is FragOrFireBombOrFlashbandGrenade => oldGrenade.id === grenade.id);
+        if(!old) continue;
+
+        if(grenade.lifetime >= EXPLODE_TIME_FRAG && old.lifetime < EXPLODE_TIME_FRAG){
+            explosionPlaces[grenade.id] = { position: grenade.position, time: Date.now() };
+        }
     }
-    componentDidMount(){
-        actions.on("toggleAvatars", () => {
-            this.setState({ avatars: !this.state.avatars });
-        })
-    }
-    round = (n: number) => {
-        const r = 0.02;
-        return Math.round(n / r) * r;
+    for(const grenadeId of Object.keys(explosionPlaces)){
+        const doesExist = data.grenades.some(grenade => grenade.id === grenadeId);
+        if(!doesExist){
+            delete explosionPlaces[grenadeId];
+        }
     }
 
-    parsePosition = (position: number[], size: number, config: ScaleConfig) => {
-        if (!(this.props.mapName in maps)) {
-            return [0, 0];
-        }
-        const left = config.origin.x + (position[0] * config.pxPerUX) - (size / 2);
-        const top = config.origin.y + (position[1] * config.pxPerUY) - (size / 2);
+});
 
-        return [this.round(left), this.round(top)];
-    }
+const LexoRadarContainer = ({ size = 300, mapName, bomb, player, players, grenades }: IProps) => {
+    const offset = (size - (size * size / 1024)) / 2;
 
-    parseGrenadePosition = (grenade: ExtendedGrenade, config: ScaleConfig) => {
-        if (!("position" in grenade)) {
-            return null;
-        }
-        let size = 30;
-        if (grenade.type === "smoke") {
-            size = 40;
-        }
-        return this.parsePosition(grenade.position.split(", ").map(pos => Number(pos)), size, config);
-    }
-    getGrenadePosition = (grenade: ExtendedGrenade, config: ScaleConfig) => {
-        const grenadeData = grenadesStates.slice(0, positionsToAverage).map(grenades => grenades.filter(gr => gr.id === grenade.id)[0]).filter(pl => !!pl);
-        if (grenadeData.length === 0) return null;
-        const positions = grenadeData.map(grenadeEntry => this.parseGrenadePosition(grenadeEntry, config)).filter(posData => posData !== null) as number[][];
-        if (positions.length === 0) return null;
-        const entryAmount = positions.length;
-        let x = 0;
-        let y = 0;
-        for (const position of positions) {
-            x += position[0];
-            y += position[1];
-        }
-
-        return [x / entryAmount, y / entryAmount];
-    }
-    getPosition = (player: Player, mapConfig: ScaleConfig) => {
-        const playerData = playersStates.slice(0, positionsToAverage).map(players => players.filter(pl => pl.steamid === player.steamid)[0]).filter(pl => !!pl);
-        if (playerData.length === 0) return [0, 0];
-        const positions = playerData.map(playerEntry => this.parsePosition(playerEntry.position, config.playerSize, mapConfig));
-        const entryAmount = positions.length;
-        let x = 0;
-        let y = 0;
-        for (const position of positions) {
-            x += position[0];
-            y += position[1];
-        }
-
-        const degree = calculateDirection(player);
-        return [x / entryAmount, y / entryAmount, degree];
-    }
-    getBombPosition = (mapConfig: ScaleConfig) => {
-        const bombData = bombStates.slice(0, positionsToAverage).filter(pl => !!pl);
-        if (bombData.length === 0) return null;
-        const positions = bombData.map(bombEntry => this.parsePosition(bombEntry.position, config.playerSize, mapConfig));
-        const entryAmount = positions.length;
-        let x = 0;
-        let y = 0;
-        for (const position of positions) {
-            x += position[0];
-            y += position[1];
-        }
-
-        return [x / entryAmount, y / entryAmount];
-    }
-    mapBomb = () => {
-        if (!(this.props.mapName in maps)) {
-            return null;
-        }
-        const { bomb } = this.props;
-        if(!bomb) return null;
-        if(bomb.state === "carried" || bomb.state === "planting" || bomb.state === "exploded") return null
-        const map = maps[this.props.mapName];
-        if ("config" in map) {
-            const position = this.getBombPosition(map.config);
-            if(!position) return null;
-            const bombObject: BombObject = {
-                ...bomb,
-                position,
-                id: "bomb_upper"
-            }
-            return [bombObject];
-        }
-        const bombObjects = map.configs.map(config => ({
-            ...bomb,
-            position: this.getBombPosition(config.config),
-            id: `bomb_${config.id}`
-        }) as BombObject).flat();
-        return  bombObjects;
-    }
-    mapPlayer = (active: Player | null) => (player: Player): RadarPlayerObject | RadarPlayerObject[] | null => {
-        if (!(this.props.mapName in maps)) {
-            return null;
-        }
-        const map = maps[this.props.mapName];
-        const playerObject: RadarPlayerObject = {
-            id: player.steamid,
-            label: player.observer_slot !== undefined ? player.observer_slot : "",
-            side: player.team.side,
-            position: [],
-            visible: true,
-            isActive: !!active && active.steamid === player.steamid,
-            forward: 0,
-            steamid: player.steamid,
-            isAlive: player.state.health > 0,
-            hasBomb: !!Object.values(player.weapons).find(weapon => weapon.type === "C4")
-        }
-        if ("config" in map) {
-            const position = this.getPosition(player, map.config);
-            playerObject.position = position;
-            return playerObject;
-        }
-        return map.configs.map(config => ({
-            ...playerObject,
-            position: this.getPosition(player, config.config),
-            id: `${player.steamid}_${config.id}`,
-            visible: config.isVisible(player.position[2])
-        }));
-    }
-    mapGrenade = (extGrenade: ExtendedGrenade) => {
-        if (!(this.props.mapName in maps)) {
-            return null;
-        }
-        const map = maps[this.props.mapName];
-        if (extGrenade.type === "inferno") {
-            const mapFlame = (id: string) => {
-                if ("config" in map) {
-                    return ({
-                        position: this.parsePosition(extGrenade.flames[id].split(", ").map(pos => Number(pos)), 12, map.config),
-                        id: `${id}_${extGrenade.id}`,
-                        visible: true
-                    });
-                }
-                return map.configs.map(config => ({
-                    id: `${id}_${extGrenade.id}_${config.id}`,
-                    visible: config.isVisible(extGrenade.flames[id].split(", ").map(Number)[2]),
-                    position: this.parsePosition(extGrenade.flames[id].split(", ").map(pos => Number(pos)), 12, config.config)
-                }));
-            }
-            const flames = Object.keys(extGrenade.flames).map(mapFlame).flat();
-            const flameObjects: RadarGrenadeObject[] = flames.map(flame => ({
-                ...flame,
-                type: 'inferno',
-                state: 'landed'
-            }));
-            return flameObjects;
-        }
-
-        if ("config" in map) {
-            const position = this.getGrenadePosition(extGrenade, map.config);
-            if (!position) return null;
-            const grenadeObject: RadarGrenadeObject = {
-                type: extGrenade.type,
-                state: 'inair',
-                position,
-                id: extGrenade.id,
-                visible: true
-            }
-            if (extGrenade.type === "smoke") {
-                if (extGrenade.effecttime !== "0.0") {
-                    grenadeObject.state = "landed";
-                    if (Number(extGrenade.effecttime) >= 16.5) {
-                        grenadeObject.state = 'exploded';
-                    }
-                }
-            } else if (extGrenade.type === 'flashbang' || extGrenade.type === 'frag') {
-                if (Number(extGrenade.lifetime) >= 1.25) {
-                    grenadeObject.state = 'exploded';
-                }
-            }
-            return grenadeObject;
-        }
-        return map.configs.map(config => {
-            const position = this.getGrenadePosition(extGrenade, config.config);
-            if (!position) return null;
-            const grenadeObject: RadarGrenadeObject = {
-                type: extGrenade.type,
-                state: 'inair',
-                position,
-                id: `${extGrenade.id}_${config.id}`,
-                visible: config.isVisible(extGrenade.position.split(", ").map(Number)[2])
-            }
-            if (extGrenade.type === "smoke") {
-                if (extGrenade.effecttime !== "0.0") {
-                    grenadeObject.state = "landed";
-                    if (Number(extGrenade.effecttime) >= 16.5) {
-                        grenadeObject.state = 'exploded';
-                    }
-                }
-            } else if (extGrenade.type === 'flashbang' || extGrenade.type === 'frag') {
-                if (Number(extGrenade.lifetime) >= 1.25) {
-                    grenadeObject.state = 'exploded';
-                }
-            }
-            return grenadeObject;
-        }).filter((grenade): grenade is RadarGrenadeObject => grenade !== null);
-
-    }
-    render() {
-        const players: RadarPlayerObject[] = this.props.players.map(this.mapPlayer(this.props.player)).filter((player): player is RadarPlayerObject => player !== null).flat();
-        playersStates.unshift(this.props.players);
-        if (playersStates.length > positionsToAverage) {
-            playersStates = playersStates.slice(0, positionsToAverage);
-        }
-        let grenades: RadarGrenadeObject[] = [];
-        const currentGrenades = Object.keys(this.props.grenades as { [key: string]: Grenade }).map(grenadeId => ({ ...this.props.grenades[grenadeId], id: grenadeId })) as ExtendedGrenade[];
-        if (currentGrenades) {
-            grenades = currentGrenades.map(this.mapGrenade).filter(entry => entry !== null).flat() as RadarGrenadeObject[];
-            grenadesStates.unshift(currentGrenades);
-        }
-        if (grenadesStates.length > positionsToAverage) {
-            grenadesStates = grenadesStates.slice(0, positionsToAverage);
-        }
-        let bomb = this.mapBomb();
-        if(this.props.bomb){
-            bombStates.unshift(this.props.bomb);
-            if(bombStates.length > positionsToAverage){
-                bombStates = bombStates.slice(0,positionsToAverage);
-            }
-        }
-        const size = this.props.size || 300;
-        const offset = (size - (size * size / 1024)) / 2;
-        // s*(1024-s)/2048
-        if (!(this.props.mapName in maps)) {
-            return <div className="map-container" style={{ width: size, height: size, transform: `scale(${size / 1024})`, top: -offset, left: -offset }}>
-                Unsupported map
-            </div>;
-        }
+    if (!(mapName in maps)) {
         return <div className="map-container" style={{ width: size, height: size, transform: `scale(${size / 1024})`, top: -offset, left: -offset }}>
-            <LexoRadar
-                players={players}
-                grenades={grenades}
-                parsePosition={this.parsePosition}
-                bomb={bomb}
-                mapName={this.props.mapName}
-                mapConfig={maps[this.props.mapName]}
-                avatars={this.state.avatars}
-            />
+            Unsupported map
         </div>;
     }
+    const playersExtended: RadarPlayerObject[] = players.map(pl => extendPlayer({ player: pl, steamId: player?.steamid || null, mapName })).filter((player): player is RadarPlayerObject => player !== null).flat();
+    const grenadesExtended =  grenades.map(grenade => extendGrenade({ grenade, side: playersExtended.find(player => player.steamid === grenade.owner)?.side || 'CT', mapName })).filter(entry => entry !== null).flat() as RadarGrenadeObject[];
+    const config = maps[mapName];
+
+    const zooms = config && config.zooms || [];
+
+    const activeZoom = zooms.find(zoom => zoom.threshold(playersExtended.map(pl => pl.player)));
+
+    const reverseZoom = 1/(activeZoom && activeZoom.zoom || 1);
+    // s*(1024-s)/2048
+    return <div className="map-container" style={{ width: size, height: size, transform: `scale(${size / 1024})`, top: -offset, left: -offset }}>
+        <LexoRadar
+            players={playersExtended}
+            grenades={grenadesExtended}
+            bomb={bomb}
+            mapName={mapName}
+            mapConfig={config}
+            zoom={activeZoom}
+            reverseZoom={DESCALE_ON_ZOOM ? reverseZoom.toFixed(2) : '1'}
+        />
+    </div>;
 }
 
-export default App;
+export default LexoRadarContainer;

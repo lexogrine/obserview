@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { actions, socket } from '../App';
+import { useEffect, useRef, useState } from 'react';
 import './canvas.scss';
+import { socket } from '../api/socket';
+import { actions } from '../api/contexts/actions';
 
 interface CanvasMouse {
     click: boolean;

@@ -1,0 +1,1 @@
+export const panelDefinition = [] as const;

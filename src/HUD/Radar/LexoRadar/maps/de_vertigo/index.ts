@@ -1,4 +1,4 @@
-import { Player } from 'csgogsi-socket';
+import { Player } from 'csgogsi';
 import radar from './radar.png'
 
 const high = {

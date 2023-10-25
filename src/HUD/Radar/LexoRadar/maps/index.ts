@@ -8,8 +8,8 @@ import de_nuke from './de_nuke';
 import de_vertigo from './de_vertigo';
 import de_anubis from './de_anubis';
 import de_ancient from './de_ancient';
-import api from '../../../../api/api';
-import { Player } from 'csgogsi-socket';
+import api from '../../../../api';
+import { Player } from 'csgogsi';
 
 export type ZoomAreas = {
     threshold: (players: Player[]) => boolean;

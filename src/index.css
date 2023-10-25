@@ -12,7 +12,6 @@ body {
   font-family: 'Stratum2', 'Montserrat', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: black;
   /*background-image: url('./assets/bg.png');/**/
 }
 
@@ -49,6 +48,7 @@ code {
   --color-ct: #5788a8;
   --color-new-t: #f0c941;
   --color-new-ct: #5ab8f4;
+  --color-new-ct: rgba(126,159,184);
   --color-bomb: #f22222;
   --color-defuse: #2222f2;
 }
