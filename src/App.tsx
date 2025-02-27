@@ -118,7 +118,7 @@ class App extends React.Component<any, { match: Match | null, game: CSGO | null,
 		}
 
 		socket.on("readyToRegister", () => {
-			socket.emit("register", name, isDev, "csgo", isInWindow ? "IPC" : "DEFAULT");
+			socket.emit("register", name, isDev, "cs2", isInWindow ? "IPC" : "DEFAULT");
 		});
 		socket.on(`hud_config`, (data: any) => {
 			configs.save(data);
